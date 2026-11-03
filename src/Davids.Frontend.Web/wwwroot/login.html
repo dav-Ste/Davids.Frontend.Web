@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f6fb">
+  <meta name="description" content="Customer Single Sign-On and self-service registration for Davids Services.">
+  <title>Davids | Customer Portal Sign In</title>
+  <link rel="icon" href="/portal/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/portal/login.css">
+  <script src="/portal/login.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+
+  <main class="auth-shell">
+    <section class="auth-story">
+      <a class="brand" href="/portal/login" aria-label="Davids Customer Portal">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M7 12.5 20 5l13 7.5v15L20 35 7 27.5v-15Z" stroke="currentColor" stroke-width="2"/><path d="m13 21 4.2 4.2L27.5 15" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="brand-name">davids<span class="brand-dot">.</span></span>
+      </a>
+      <div class="story-copy">
+        <p class="eyebrow">CUSTOMER SELF-SERVICE PORTAL</p>
+        <h1>Manage your profile, security &amp; orders.</h1>
+        <p class="story-lead">Sign in with OpenID Connect PKCE (<code>S256</code>) against <code>Davids.Services.Identity</code> using an isolated <code>HttpOnly</code> BFF cookie (<code>davids_customer_bff</code>) — no tokens are ever exposed to browser storage.</p>
+      </div>
+      <div class="story-meta">
+        <span>OIDC PKCE S256</span>
+        <span>·</span>
+        <span>Isolated Customer BFF Cookie</span>
+        <span>·</span>
+        <span>Full Activity Audit</span>
+      </div>
+    </section>
+
+    <section class="auth-panel">
+      <div class="auth-card">
+        <div class="auth-heading">
+          <p class="eyebrow">CUSTOMER SINGLE SIGN-ON</p>
+          <h2>Sign in to your account</h2>
+          <p class="muted-copy">Authenticate directly on the Customer OIDC Authority (<code>Davids.Services.Identity</code>) or register a new customer login below.</p>
+        </div>
+
+        <div id="login-banner" class="inline-message" role="alert" hidden></div>
+
+        <div class="form-stack">
+          <button id="oidc-login-btn" class="button button-primary button-wide" type="button">
+            Continue with Customer OIDC
+          </button>
+        </div>
+
+        <hr style="border:0;border-top:1px solid #e8ecf3;margin:22px 0;">
+
+        <form id="signup-form" class="form-stack" novalidate>
+          <p class="eyebrow">NEW TO DAVIDS?</p>
+          <label class="field-label" for="signup-email">Email address</label>
+          <input class="text-input" id="signup-email" name="email" type="email" maxlength="320" autocomplete="email" placeholder="you@example.com" required>
+          <label class="field-label" for="signup-password">Create password (10+ chars)</label>
+          <input class="text-input" id="signup-password" name="password" type="password" minlength="10" maxlength="200" autocomplete="new-password" placeholder="At least 10 characters" required>
+          <div id="signup-message" class="inline-message" role="status" hidden></div>
+          <button id="signup-submit" class="button button-outline button-wide" type="submit">Create customer account</button>
+        </form>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

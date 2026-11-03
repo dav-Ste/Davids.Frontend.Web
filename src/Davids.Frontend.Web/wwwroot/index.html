@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f6fb">
+  <meta name="description" content="Customer self-service profile, credential management, and activity audit portal for Davids Services.">
+  <title>Davids | Customer Web Portal</title>
+  <link rel="icon" href="/portal/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/portal/app.css">
+  <script src="/portal/app.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+
+  <div id="workspace" class="workspace">
+    <aside class="sidebar">
+      <a class="brand brand-sidebar" href="/portal" aria-label="Davids Customer Web Portal">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M7 12.5 20 5l13 7.5v15L20 35 7 27.5v-15Z" stroke="currentColor" stroke-width="2"/><path d="m13 21 4.2 4.2L27.5 15" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="brand-name">davids<span class="brand-dot">.</span></span>
+      </a>
+      <div class="workspace-label">CUSTOMER PORTAL</div>
+      <nav class="side-nav" aria-label="Customer navigation">
+        <button id="nav-profile" class="nav-item active" type="button">
+          <span>My Profile</span>
+          <span class="nav-badge">ME</span>
+        </button>
+        <button id="nav-security" class="nav-item" type="button">
+          <span>Sign-In &amp; Security</span>
+          <span class="nav-badge">CIAM</span>
+        </button>
+        <button id="nav-activity" class="nav-item" type="button">
+          <span>Account Activity</span>
+          <span class="nav-badge">LOG</span>
+        </button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-help">
+          <span>
+            <strong>Zero browser tokens</strong>
+            <small>Protected by <code>davids_customer_bff</code> OIDC PKCE session &amp; <code>CustomerBearer</code>.</small>
+          </span>
+        </div>
+        <div class="sidebar-footnote">DAVIDS SERVICES <span>·</span> CUSTOMER WEB PORTAL</div>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="breadcrumb">
+          <span>Customer Portal</span>
+          <strong id="breadcrumb-title">My Profile</strong>
+        </div>
+        <div class="topbar-actions">
+          <span class="connection-chip"><span class="connection-dot"></span>CustomerBffCookie verified</span>
+          <div class="user-identity">
+            <span id="user-avatar" class="avatar">C</span>
+            <span class="user-label">
+              <strong id="user-name">Customer</strong>
+              <small id="user-role">user</small>
+            </span>
+          </div>
+          <button id="logout-button" class="button button-quiet" type="button">Sign out</button>
+        </div>
+      </header>
+
+      <div class="content-wrap">
+        <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+        <section id="profile-view" class="page-view">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">CUSTOMER PROFILE (CUSTOMERSDB)</p>
+              <h1>My delivery profile &amp; standing</h1>
+              <p class="page-subtitle">Complete or update your delivery details via <code>GET /customers/me</code> and <code>PUT /customers/me</code>.</p>
+            </div>
+            <button id="profile-refresh" class="button button-outline" type="button">Refresh</button>
+          </div>
+
+          <div class="stat-grid">
+            <article class="stat-card">
+              <div class="stat-top"><span class="stat-label">ACCOUNT STANDING</span></div>
+              <strong id="profile-state" class="stat-number">—</strong>
+              <small id="profile-vip">Checking tier…</small>
+            </article>
+            <article class="stat-card">
+              <div class="stat-top"><span class="stat-label">COMPLETED ORDERS</span></div>
+              <strong id="profile-orders-count" class="stat-number">0</strong>
+              <small>20+ completed orders unlocks VIP</small>
+            </article>
+            <article class="stat-card">
+              <div class="stat-top"><span class="stat-label">PRIMARY EMAIL</span></div>
+              <strong id="profile-email" class="stat-email">—</strong>
+              <small id="profile-created">Member record</small>
+            </article>
+          </div>
+
+          <article class="surface-card complete-card">
+            <p class="eyebrow">SELF-SERVICE PROFILE</p>
+            <h2>Update name &amp; delivery address</h2>
+            <p class="muted-copy">Completing an incomplete profile automatically activates your account to <code>valid</code>.</p>
+            <form id="profile-form" class="form-stack" novalidate>
+              <label class="field-label" for="profile-full-name">Full name</label>
+              <input class="text-input" id="profile-full-name" name="fullName" type="text" maxlength="100" placeholder="Your full name" required>
+              <label class="field-label" for="profile-address">Delivery address</label>
+              <textarea class="text-input text-area" id="profile-address" name="address" maxlength="250" rows="3" placeholder="Street, town/city and postcode" required></textarea>
+              <div id="profile-message" class="inline-message" role="status" hidden></div>
+              <button id="profile-submit" class="button button-primary" type="submit">Save my profile</button>
+            </form>
+          </article>
+        </section>
+
+        <section id="security-view" class="page-view" hidden>
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">CREDENTIALS &amp; LOGIN (IDENTITYDB)</p>
+              <h1>Sign-in email &amp; password</h1>
+              <p class="page-subtitle">Update your authoritative login email (automatically synced to your customer profile via transactional Outbox) or rotate your password.</p>
+            </div>
+          </div>
+
+          <div class="profile-grid">
+            <article class="surface-card complete-card">
+              <p class="eyebrow">LOGIN EMAIL</p>
+              <h2>Change sign-in email</h2>
+              <p class="muted-copy">Requires your current password to confirm ownership.</p>
+              <form id="email-form" class="form-stack" novalidate>
+                <label class="field-label" for="new-email-input">New email address</label>
+                <input class="text-input" id="new-email-input" type="email" maxlength="320" autocomplete="email" required>
+                <label class="field-label" for="email-current-password">Current password</label>
+                <input class="text-input" id="email-current-password" type="password" minlength="10" maxlength="200" autocomplete="current-password" required>
+                <div id="email-message" class="inline-message" role="status" hidden></div>
+                <button id="email-submit" class="button button-primary" type="submit">Update my email</button>
+              </form>
+            </article>
+
+            <article class="surface-card complete-card">
+              <p class="eyebrow">PASSWORD ROTATION</p>
+              <h2>Change password</h2>
+              <p class="muted-copy">Revokes active refresh and access grants immediately after rotation.</p>
+              <form id="password-form" class="form-stack" novalidate>
+                <label class="field-label" for="current-password-input">Current password</label>
+                <input class="text-input" id="current-password-input" type="password" minlength="10" maxlength="200" autocomplete="current-password" required>
+                <label class="field-label" for="new-password-input">New password (10+ chars)</label>
+                <input class="text-input" id="new-password-input" type="password" minlength="10" maxlength="200" autocomplete="new-password" required>
+                <div id="password-message" class="inline-message" role="status" hidden></div>
+                <button id="password-submit" class="button button-outline" type="submit">Rotate password</button>
+              </form>
+            </article>
+          </div>
+        </section>
+
+        <section id="activity-view" class="page-view" hidden>
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">TRANSPARENCY &amp; AUDIT</p>
+              <h1>My sign-in &amp; change history</h1>
+              <p class="page-subtitle">Review recent sign-in attempts and every audited change made to your login or profile.</p>
+            </div>
+            <button id="activity-refresh" class="button button-outline" type="button">Refresh</button>
+          </div>
+
+          <article class="surface-card directory-card">
+            <div class="directory-toolbar">
+              <div class="directory-toolbar-head">
+                <h2>Profile &amp; credential change history</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="customer-table audit-table">
+                <thead>
+                  <tr>
+                    <th>TIMESTAMP</th>
+                    <th>SOURCE</th>
+                    <th>ACTION</th>
+                    <th>PERFORMED BY</th>
+                    <th>CHANGES</th>
+                  </tr>
+                </thead>
+                <tbody id="my-changes-tbody"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="surface-card directory-card audit-log-card">
+            <div class="directory-toolbar">
+              <div class="directory-toolbar-head">
+                <h2>Recent sign-in attempts</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="customer-table audit-table">
+                <thead>
+                  <tr>
+                    <th>TIMESTAMP</th>
+                    <th>OUTCOME</th>
+                    <th>CLIENT IP</th>
+                    <th>CORRELATION</th>
+                  </tr>
+                </thead>
+                <tbody id="my-logins-tbody"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </div>
+      <footer class="main-footer"><span>DAVIDS SERVICES</span><span>Customer Web Portal (Davids.Frontend.Web)</span></footer>
+    </main>
+  </div>
+</body>
+</html>

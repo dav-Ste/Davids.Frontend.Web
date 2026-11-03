@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <UserSecretsId>davids-frontend-web</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup Label="Shared ServiceDefaults (ProjectReference by default; PackageReference when UseSharedPackageReference=true)">
+    <ProjectReference Include="../../../Davids.Shared/src/Davids.ServiceDefaults/Davids.ServiceDefaults.csproj" Condition="'$(UseSharedPackageReference)' != 'true'" />
+    <PackageReference Include="Davids.ServiceDefaults" Condition="'$(UseSharedPackageReference)' == 'true'" />
+  </ItemGroup>
+</Project>
