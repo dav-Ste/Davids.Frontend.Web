@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f3f6fb">
-  <meta name="description" content="Customer self-service profile, credential management, and activity audit portal for Davids Services.">
-  <title>Davids | Customer Web Portal</title>
+  <meta name="description" content="Customer storefront, shopping basket, order tracking, profile, and credential portal for Davids Services.">
+  <title>Davids | Customer Storefront &amp; Web Portal</title>
   <link rel="icon" href="/portal/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/portal/app.css">
   <script src="/portal/app.js" defer></script>
@@ -20,9 +20,25 @@
         <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M7 12.5 20 5l13 7.5v15L20 35 7 27.5v-15Z" stroke="currentColor" stroke-width="2"/><path d="m13 21 4.2 4.2L27.5 15" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
         <span class="brand-name">davids<span class="brand-dot">.</span></span>
       </a>
-      <div class="workspace-label">CUSTOMER PORTAL</div>
-      <nav class="side-nav" aria-label="Customer navigation">
-        <button id="nav-profile" class="nav-item active" type="button">
+      <div class="workspace-label">SHOP &amp; ORDERS</div>
+      <nav class="side-nav" aria-label="Customer commerce navigation">
+        <button id="nav-store" class="nav-item active" type="button">
+          <span>Product Storefront</span>
+          <span class="nav-badge">SHOP</span>
+        </button>
+        <button id="nav-basket" class="nav-item" type="button">
+          <span>Shopping Basket</span>
+          <span id="nav-basket-count" class="nav-badge">0</span>
+        </button>
+        <button id="nav-orders" class="nav-item" type="button">
+          <span>My Orders &amp; Payments</span>
+          <span id="nav-orders-count" class="nav-badge">0</span>
+        </button>
+      </nav>
+
+      <div class="workspace-label">ACCOUNT &amp; SECURITY</div>
+      <nav class="side-nav" aria-label="Customer account navigation">
+        <button id="nav-profile" class="nav-item" type="button">
           <span>My Profile</span>
           <span class="nav-badge">ME</span>
         </button>
@@ -50,9 +66,10 @@
       <header class="topbar">
         <div class="breadcrumb">
           <span>Customer Portal</span>
-          <strong id="breadcrumb-title">My Profile</strong>
+          <strong id="breadcrumb-title">Product Storefront</strong>
         </div>
         <div class="topbar-actions">
+          <button id="topbar-basket-btn" class="button button-outline" type="button">Basket (<span id="topbar-basket-count">0</span>)</button>
           <span class="connection-chip"><span class="connection-dot"></span>CustomerBffCookie verified</span>
           <div class="user-identity">
             <span id="user-avatar" class="avatar">C</span>
@@ -68,7 +85,152 @@
       <div class="content-wrap">
         <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-        <section id="profile-view" class="page-view">
+        <section id="store-view" class="page-view">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">PRODUCT CATALOG (PRODUCTSDB)</p>
+              <h1>Product Storefront</h1>
+              <p class="page-subtitle">Browse live catalog pricing and stock from <code>GET /products</code> and add items directly to your server-side shopping basket.</p>
+            </div>
+            <button id="store-refresh" class="button button-outline" type="button">Refresh catalog</button>
+          </div>
+
+          <article class="surface-card store-filter-bar">
+            <input id="store-search" class="text-input" type="search" maxlength="100" placeholder="Search by product name, SKU, or description…">
+            <select id="store-category" class="text-input store-select" aria-label="Filter by category">
+              <option value="">All categories</option>
+              <option value="Hardware">Hardware</option>
+              <option value="Audio">Audio</option>
+              <option value="Peripherals">Peripherals</option>
+              <option value="Accessories">Accessories</option>
+            </select>
+          </article>
+
+          <div id="store-message" class="inline-message" role="status" hidden></div>
+          <div id="product-grid" class="product-grid"></div>
+        </section>
+
+        <section id="basket-view" class="page-view" hidden>
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">SHOPPING BASKET &amp; CHECKOUT (BASKETSDB → ORDERSDB)</p>
+              <h1>Shopping basket &amp; checkout</h1>
+              <p class="page-subtitle">Adjust item quantities via <code>PUT /baskets/me/items</code> and place an order through <code>POST /orders/checkout</code>.</p>
+            </div>
+            <div class="heading-actions">
+              <button id="basket-clear" class="button button-outline" type="button">Clear basket</button>
+              <button id="basket-refresh" class="button button-outline" type="button">Refresh</button>
+            </div>
+          </div>
+
+          <div class="checkout-layout">
+            <article class="surface-card directory-card">
+              <div class="directory-toolbar">
+                <div class="directory-toolbar-head">
+                  <h2>Items in your basket</h2>
+                  <strong id="basket-subtotal" class="basket-subtotal">GBP 0.00</strong>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="customer-table">
+                  <thead>
+                    <tr>
+                      <th>PRODUCT</th>
+                      <th>UNIT PRICE</th>
+                      <th>QUANTITY</th>
+                      <th>LINE TOTAL</th>
+                      <th>ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody id="basket-tbody"></tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="surface-card complete-card">
+              <p class="eyebrow">ASYNC PAYMENT SAGA CHECKOUT</p>
+              <h2>Complete your order</h2>
+              <p class="muted-copy">Prices and stock are re-verified server-side against <code>Davids.Services.Products</code>. Use card last-4 <code>4242</code> for instant capture or <code>0002</code> to test issuer decline.</p>
+              <form id="checkout-form" class="form-stack" novalidate>
+                <label class="field-label" for="checkout-full-name">Recipient full name</label>
+                <input class="text-input" id="checkout-full-name" type="text" maxlength="120" placeholder="Recipient full name" required>
+                <label class="field-label" for="checkout-address">Shipping address</label>
+                <textarea class="text-input text-area" id="checkout-address" maxlength="300" rows="3" placeholder="Street, city, and postcode" required></textarea>
+                <label class="field-label" for="checkout-payment-method">Payment method</label>
+                <select class="text-input" id="checkout-payment-method">
+                  <option value="card">Payment Card</option>
+                  <option value="wallet">Digital Wallet</option>
+                  <option value="invoice">Corporate Invoice</option>
+                </select>
+                <label class="field-label" for="checkout-card-last4">Card last 4 digits (4242 = capture, 0002 = decline)</label>
+                <input class="text-input" id="checkout-card-last4" type="text" inputmode="numeric" maxlength="4" value="4242" required>
+                <div id="checkout-message" class="inline-message" role="status" hidden></div>
+                <button id="checkout-submit" class="button button-primary button-wide" type="submit">Place order</button>
+              </form>
+            </article>
+          </div>
+        </section>
+
+        <section id="orders-view" class="page-view" hidden>
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">ORDER LIFECYCLE &amp; PAYMENT LEDGER (ORDERSDB &amp; PAYMENTSDB)</p>
+              <h1>My orders &amp; payment receipts</h1>
+              <p class="page-subtitle">Track asynchronous RabbitMQ payment capture (<code>orders.order_placed</code> → <code>payments.payment_captured</code> → <code>orders.order_completed</code>).</p>
+            </div>
+            <button id="orders-refresh" class="button button-outline" type="button">Refresh orders</button>
+          </div>
+
+          <article class="surface-card directory-card">
+            <div class="directory-toolbar">
+              <div class="directory-toolbar-head">
+                <h2>Order history</h2>
+                <small id="orders-poll-indicator" class="muted-copy"></small>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="customer-table audit-table">
+                <thead>
+                  <tr>
+                    <th>ORDER</th>
+                    <th>PLACED</th>
+                    <th>ITEMS</th>
+                    <th>TOTAL</th>
+                    <th>STATUS</th>
+                    <th>PAYMENT REF</th>
+                    <th>ACTION</th>
+                  </tr>
+                </thead>
+                <tbody id="orders-tbody"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="surface-card directory-card audit-log-card">
+            <div class="directory-toolbar">
+              <div class="directory-toolbar-head">
+                <h2>Payment receipts (Davids.Services.Payments)</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="customer-table audit-table">
+                <thead>
+                  <tr>
+                    <th>TIMESTAMP</th>
+                    <th>PROVIDER REF</th>
+                    <th>METHOD</th>
+                    <th>AMOUNT</th>
+                    <th>STATUS</th>
+                    <th>NOTES</th>
+                  </tr>
+                </thead>
+                <tbody id="payments-tbody"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section id="profile-view" class="page-view" hidden>
           <div class="page-heading">
             <div>
               <p class="eyebrow">CUSTOMER PROFILE (CUSTOMERSDB)</p>
@@ -205,7 +367,7 @@
           </article>
         </section>
       </div>
-      <footer class="main-footer"><span>DAVIDS SERVICES</span><span>Customer Web Portal (Davids.Frontend.Web)</span></footer>
+      <footer class="main-footer"><span>DAVIDS SERVICES</span><span>Customer Storefront &amp; Web Portal (Davids.Frontend.Web)</span></footer>
     </main>
   </div>
 </body>

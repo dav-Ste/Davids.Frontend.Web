@@ -9,13 +9,23 @@
   const state = {
     customerId: null,
     email: null,
-    activeView: "profile",
-    toastTimer: null
+    activeView: "store",
+    basketItems: [],
+    toastTimer: null,
+    ordersPollTimer: null,
+    searchDebounce: null
   };
 
   const el = id => document.getElementById(id);
 
   const dom = {
+    navStore: el("nav-store"),
+    navBasket: el("nav-basket"),
+    navBasketCount: el("nav-basket-count"),
+    topbarBasketBtn: el("topbar-basket-btn"),
+    topbarBasketCount: el("topbar-basket-count"),
+    navOrders: el("nav-orders"),
+    navOrdersCount: el("nav-orders-count"),
     navProfile: el("nav-profile"),
     navSecurity: el("nav-security"),
     navActivity: el("nav-activity"),
@@ -26,9 +36,35 @@
     logoutButton: el("logout-button"),
     toast: el("toast"),
 
+    storeView: el("store-view"),
+    basketView: el("basket-view"),
+    ordersView: el("orders-view"),
     profileView: el("profile-view"),
     securityView: el("security-view"),
     activityView: el("activity-view"),
+
+    storeRefresh: el("store-refresh"),
+    storeSearch: el("store-search"),
+    storeCategory: el("store-category"),
+    storeMessage: el("store-message"),
+    productGrid: el("product-grid"),
+
+    basketClear: el("basket-clear"),
+    basketRefresh: el("basket-refresh"),
+    basketSubtotal: el("basket-subtotal"),
+    basketTbody: el("basket-tbody"),
+    checkoutForm: el("checkout-form"),
+    checkoutFullName: el("checkout-full-name"),
+    checkoutAddress: el("checkout-address"),
+    checkoutPaymentMethod: el("checkout-payment-method"),
+    checkoutCardLast4: el("checkout-card-last4"),
+    checkoutMessage: el("checkout-message"),
+    checkoutSubmit: el("checkout-submit"),
+
+    ordersRefresh: el("orders-refresh"),
+    ordersPollIndicator: el("orders-poll-indicator"),
+    ordersTbody: el("orders-tbody"),
+    paymentsTbody: el("payments-tbody"),
 
     profileRefresh: el("profile-refresh"),
     profileState: el("profile-state"),
@@ -130,21 +166,423 @@
     return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString();
   }
 
+  function formatMoney(amount, currency = "GBP") {
+    const num = Number(amount || 0);
+    return `${currency} ${num.toFixed(2)}`;
+  }
+
+  function stopOrdersPolling() {
+    if (state.ordersPollTimer) {
+      clearInterval(state.ordersPollTimer);
+      state.ordersPollTimer = null;
+    }
+    if (dom.ordersPollIndicator) {
+      dom.ordersPollIndicator.textContent = "";
+    }
+  }
+
   function switchView(view) {
     state.activeView = view;
+    if (view !== "orders") {
+      stopOrdersPolling();
+    }
+
+    dom.storeView.hidden = view !== "store";
+    dom.basketView.hidden = view !== "basket";
+    dom.ordersView.hidden = view !== "orders";
     dom.profileView.hidden = view !== "profile";
     dom.securityView.hidden = view !== "security";
     dom.activityView.hidden = view !== "activity";
 
+    dom.navStore.classList.toggle("active", view === "store");
+    dom.navBasket.classList.toggle("active", view === "basket");
+    dom.navOrders.classList.toggle("active", view === "orders");
     dom.navProfile.classList.toggle("active", view === "profile");
     dom.navSecurity.classList.toggle("active", view === "security");
     dom.navActivity.classList.toggle("active", view === "activity");
 
-    dom.breadcrumbTitle.textContent = view === "security"
-      ? "Sign-In & Security"
-      : view === "activity"
-        ? "Account Activity"
-        : "My Profile";
+    const titles = {
+      store: "Product Storefront",
+      basket: "Shopping Basket & Checkout",
+      orders: "My Orders & Payments",
+      profile: "My Profile",
+      security: "Sign-In & Security",
+      activity: "Account Activity"
+    };
+    dom.breadcrumbTitle.textContent = titles[view] || "Customer Portal";
+  }
+
+  async function loadStorefront() {
+    const params = new URLSearchParams();
+    const search = dom.storeSearch.value.trim();
+    const category = dom.storeCategory.value.trim();
+    if (search) {
+      params.set("search", search);
+    }
+    if (category) {
+      params.set("category", category);
+    }
+
+    const query = params.toString();
+    const resp = await apiRequest(query ? `/products?${query}` : "/products");
+    dom.productGrid.replaceChildren();
+
+    if (!resp.ok || !Array.isArray(resp.data)) {
+      showMessage(dom.storeMessage, resp.data?.reason || "Unable to load product catalog.");
+      return;
+    }
+    showMessage(dom.storeMessage, "");
+
+    if (resp.data.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty-card";
+      const h2 = document.createElement("h2");
+      h2.textContent = "No matching products";
+      const p = document.createElement("p");
+      p.textContent = "Try clearing your search or selecting another category.";
+      empty.append(h2, p);
+      dom.productGrid.appendChild(empty);
+      return;
+    }
+
+    for (const prod of resp.data) {
+      const card = document.createElement("article");
+      card.className = "product-card";
+
+      const top = document.createElement("div");
+      const head = document.createElement("div");
+      head.className = "product-card-head";
+      const cat = document.createElement("span");
+      cat.className = "product-category";
+      cat.textContent = String(prod.category || "Catalog");
+      const sku = document.createElement("span");
+      sku.className = "product-sku";
+      sku.textContent = String(prod.sku || "");
+      head.append(cat, sku);
+
+      const title = document.createElement("h2");
+      title.className = "product-title";
+      title.textContent = String(prod.name || "");
+      const desc = document.createElement("p");
+      desc.className = "product-desc";
+      desc.textContent = String(prod.description || "");
+      top.append(head, title, desc);
+
+      const footer = document.createElement("div");
+      footer.className = "product-footer";
+      const priceCol = document.createElement("div");
+      const price = document.createElement("strong");
+      price.className = "product-price";
+      price.textContent = formatMoney(prod.price, prod.currency || "GBP");
+      const stock = document.createElement("span");
+      const inStock = Number(prod.stockQuantity || 0);
+      stock.className = inStock > 0 ? "product-stock" : "product-stock out";
+      stock.textContent = inStock > 0 ? `In stock: ${inStock}` : "Out of stock";
+      priceCol.append(price, stock);
+
+      const addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "button button-primary";
+      addBtn.disabled = inStock <= 0;
+      addBtn.textContent = inStock > 0 ? "Add to basket" : "Sold out";
+      addBtn.addEventListener("click", () => addProductToBasket(prod.id, prod.name));
+
+      footer.append(priceCol, addBtn);
+      card.append(top, footer);
+      dom.productGrid.appendChild(card);
+    }
+  }
+
+  function updateBasketCounters(totalItems) {
+    const text = String(totalItems || 0);
+    dom.navBasketCount.textContent = text;
+    dom.topbarBasketCount.textContent = text;
+  }
+
+  function renderBasket(basket) {
+    const items = Array.isArray(basket?.items) ? basket.items : [];
+    state.basketItems = items;
+    updateBasketCounters(basket?.totalItems || 0);
+    dom.basketSubtotal.textContent = formatMoney(basket?.subtotal || 0, basket?.currency || "GBP");
+    dom.basketTbody.replaceChildren();
+    dom.checkoutSubmit.disabled = items.length === 0;
+
+    if (items.length === 0) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 5;
+      td.className = "table-empty";
+      td.textContent = "Your shopping basket is empty. Add items from the Product Storefront.";
+      tr.appendChild(td);
+      dom.basketTbody.appendChild(tr);
+      return;
+    }
+
+    for (const item of items) {
+      const tr = document.createElement("tr");
+
+      const prodTd = document.createElement("td");
+      const strong = document.createElement("strong");
+      strong.textContent = String(item.productName || "");
+      const skuSmall = document.createElement("small");
+      skuSmall.className = "audit-reason";
+      skuSmall.textContent = String(item.sku || "");
+      prodTd.append(strong, skuSmall);
+
+      const unitTd = document.createElement("td");
+      unitTd.textContent = formatMoney(item.unitPrice, item.currency || "GBP");
+
+      const qtyTd = document.createElement("td");
+      const controls = document.createElement("div");
+      controls.className = "qty-controls";
+      const minus = document.createElement("button");
+      minus.type = "button";
+      minus.className = "qty-btn";
+      minus.textContent = "−";
+      minus.addEventListener("click", () => setBasketItemQuantity(item.productId, Number(item.quantity) - 1));
+      const qtyText = document.createElement("span");
+      qtyText.textContent = String(item.quantity);
+      const plus = document.createElement("button");
+      plus.type = "button";
+      plus.className = "qty-btn";
+      plus.textContent = "+";
+      plus.addEventListener("click", () => setBasketItemQuantity(item.productId, Number(item.quantity) + 1));
+      controls.append(minus, qtyText, plus);
+      qtyTd.appendChild(controls);
+
+      const lineTd = document.createElement("td");
+      lineTd.textContent = formatMoney(item.lineTotal, item.currency || "GBP");
+
+      const actionTd = document.createElement("td");
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "button button-quiet";
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", () => removeBasketItem(item.productId));
+      actionTd.appendChild(removeBtn);
+
+      tr.append(prodTd, unitTd, qtyTd, lineTd, actionTd);
+      dom.basketTbody.appendChild(tr);
+    }
+  }
+
+  async function loadMyBasket() {
+    const resp = await apiRequest("/baskets/me");
+    if (resp.status === 401) {
+      redirectToLogin("expired");
+      return;
+    }
+    if (resp.ok && resp.data) {
+      renderBasket(resp.data);
+    }
+  }
+
+  async function addProductToBasket(productId, productName) {
+    const existing = state.basketItems.find(x => String(x.productId) === String(productId));
+    const nextQty = existing ? Number(existing.quantity) + 1 : 1;
+    const resp = await apiRequest("/baskets/me/items", {
+      method: "PUT",
+      body: { productId, quantity: nextQty }
+    });
+    if (resp.status === 401) {
+      redirectToLogin("expired");
+      return;
+    }
+    if (!resp.ok) {
+      showToast(resp.data?.reason || "Could not add product to basket.");
+      return;
+    }
+    renderBasket(resp.data);
+    showToast(`Added ${productName} to basket.`);
+  }
+
+  async function setBasketItemQuantity(productId, quantity) {
+    if (quantity <= 0) {
+      await removeBasketItem(productId);
+      return;
+    }
+    const resp = await apiRequest("/baskets/me/items", {
+      method: "PUT",
+      body: { productId, quantity }
+    });
+    if (resp.ok && resp.data) {
+      renderBasket(resp.data);
+    } else {
+      showToast(resp.data?.reason || "Unable to update quantity.");
+    }
+  }
+
+  async function removeBasketItem(productId) {
+    const resp = await apiRequest(`/baskets/me/items/${encodeURIComponent(productId)}`, {
+      method: "DELETE"
+    });
+    if (resp.ok && resp.data) {
+      renderBasket(resp.data);
+      showToast("Item removed from basket.");
+    }
+  }
+
+  async function clearMyBasket() {
+    const resp = await apiRequest("/baskets/me", { method: "DELETE" });
+    if (resp.ok) {
+      renderBasket({ items: [], totalItems: 0, subtotal: 0, currency: "GBP" });
+      showToast("Shopping basket cleared.");
+    }
+  }
+
+  async function handleCheckout(event) {
+    event.preventDefault();
+    const shippingFullName = dom.checkoutFullName.value.trim();
+    const shippingAddress = dom.checkoutAddress.value.trim();
+    const paymentMethod = dom.checkoutPaymentMethod.value;
+    const cardLast4 = dom.checkoutCardLast4.value.trim();
+
+    if (!shippingFullName || !shippingAddress || !/^[0-9]{4}$/.test(cardLast4)) {
+      showMessage(dom.checkoutMessage, "Enter recipient name, shipping address, and 4 numeric card digits.");
+      return;
+    }
+
+    dom.checkoutSubmit.disabled = true;
+    showMessage(dom.checkoutMessage, "");
+    try {
+      const resp = await apiRequest("/orders/checkout", {
+        method: "POST",
+        body: { shippingFullName, shippingAddress, paymentMethod, cardLast4 }
+      });
+      if (resp.status === 401) {
+        redirectToLogin("expired");
+        return;
+      }
+      if (!resp.ok) {
+        showMessage(dom.checkoutMessage, resp.data?.reason || "Checkout could not be completed.");
+        return;
+      }
+
+      renderBasket({ items: [], totalItems: 0, subtotal: 0, currency: "GBP" });
+      showToast("Order placed! Processing payment via RabbitMQ…");
+      switchView("orders");
+      await loadMyOrdersAndPayments();
+      await loadStorefront();
+    } catch {
+      showMessage(dom.checkoutMessage, "Network error during checkout.");
+    } finally {
+      dom.checkoutSubmit.disabled = state.basketItems.length === 0;
+    }
+  }
+
+  async function cancelPendingOrder(orderId) {
+    const resp = await apiRequest(`/orders/me/${encodeURIComponent(orderId)}/cancel`, { method: "POST" });
+    if (resp.ok) {
+      showToast("Order cancelled.");
+      await loadMyOrdersAndPayments();
+    } else {
+      showToast(resp.data?.reason || "Order can no longer be cancelled.");
+    }
+  }
+
+  async function loadMyOrdersAndPayments() {
+    const [ordersResp, paymentsResp] = await Promise.all([
+      apiRequest("/orders/me?limit=50"),
+      apiRequest("/payments/me?limit=50")
+    ]);
+
+    const orders = ordersResp.ok && Array.isArray(ordersResp.data) ? ordersResp.data : [];
+    const payments = paymentsResp.ok && Array.isArray(paymentsResp.data) ? paymentsResp.data : [];
+    dom.navOrdersCount.textContent = String(orders.length);
+
+    dom.ordersTbody.replaceChildren();
+    if (orders.length === 0) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 7;
+      td.className = "table-empty";
+      td.textContent = "You have not placed any orders yet.";
+      tr.appendChild(td);
+      dom.ordersTbody.appendChild(tr);
+    } else {
+      for (const ord of orders) {
+        const tr = document.createElement("tr");
+        const idTd = document.createElement("td");
+        idTd.textContent = String(ord.id || "").slice(0, 8).toUpperCase();
+        const dateTd = document.createElement("td");
+        dateTd.textContent = formatDateTime(ord.createdAt);
+        const countTd = document.createElement("td");
+        countTd.textContent = `${ord.itemCount || 0} items`;
+        const totalTd = document.createElement("td");
+        totalTd.textContent = formatMoney(ord.totalAmount, ord.currency || "GBP");
+
+        const statusTd = document.createElement("td");
+        const chip = document.createElement("span");
+        const statusStr = String(ord.status || "pending_payment");
+        chip.className = `status-chip ${statusStr}`;
+        chip.textContent = statusStr.replace(/_/g, " ");
+        statusTd.appendChild(chip);
+
+        const refTd = document.createElement("td");
+        refTd.textContent = ord.paymentReference || ord.failureReason || "Awaiting capture…";
+
+        const actTd = document.createElement("td");
+        if (statusStr === "pending_payment") {
+          const cancelBtn = document.createElement("button");
+          cancelBtn.type = "button";
+          cancelBtn.className = "button button-quiet";
+          cancelBtn.textContent = "Cancel";
+          cancelBtn.addEventListener("click", () => cancelPendingOrder(ord.id));
+          actTd.appendChild(cancelBtn);
+        } else {
+          actTd.textContent = "—";
+        }
+
+        tr.append(idTd, dateTd, countTd, totalTd, statusTd, refTd, actTd);
+        dom.ordersTbody.appendChild(tr);
+      }
+    }
+
+    dom.paymentsTbody.replaceChildren();
+    if (payments.length === 0) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 6;
+      td.className = "table-empty";
+      td.textContent = "No payment receipts recorded yet.";
+      tr.appendChild(td);
+      dom.paymentsTbody.appendChild(tr);
+    } else {
+      for (const pay of payments) {
+        const tr = document.createElement("tr");
+        const dtTd = document.createElement("td");
+        dtTd.textContent = formatDateTime(pay.createdAt);
+        const refTd = document.createElement("td");
+        refTd.textContent = String(pay.providerReference || "—");
+        const methTd = document.createElement("td");
+        methTd.textContent = `${pay.paymentMethod || "card"} •••• ${pay.cardLast4 || "4242"}`;
+        const amtTd = document.createElement("td");
+        amtTd.textContent = formatMoney(pay.amount, pay.currency || "GBP");
+        const stTd = document.createElement("td");
+        const stChip = document.createElement("span");
+        const pStatus = String(pay.status || "captured");
+        stChip.className = `status-chip ${pStatus}`;
+        stChip.textContent = pStatus;
+        stTd.appendChild(stChip);
+        const noteTd = document.createElement("td");
+        noteTd.textContent = String(pay.failureReason || "Captured via RabbitMQ saga");
+        tr.append(dtTd, refTd, methTd, amtTd, stTd, noteTd);
+        dom.paymentsTbody.appendChild(tr);
+      }
+    }
+
+    const hasPending = orders.some(o => o.status === "pending_payment");
+    if (hasPending && state.activeView === "orders") {
+      dom.ordersPollIndicator.textContent = "Live polling payment capture…";
+      if (!state.ordersPollTimer) {
+        state.ordersPollTimer = window.setInterval(async () => {
+          await loadMyOrdersAndPayments();
+          await loadMyProfile();
+        }, 1500);
+      }
+    } else {
+      stopOrdersPolling();
+    }
   }
 
   async function loadMyProfile() {
@@ -162,13 +600,22 @@
     const standing = String(p.state || p.State || "incomplete");
     const isVip = Boolean(p.isVip ?? p.IsVip);
     const orders = Array.isArray(p.completedOrders || p.CompletedOrders) ? (p.completedOrders || p.CompletedOrders) : [];
+    const fullName = String(p.fullName || p.FullName || "");
+    const address = String(p.address || p.Address || "");
+
     dom.profileState.textContent = standing;
     dom.profileVip.textContent = isVip ? "VIP tier active" : "Standard tier";
     dom.profileOrdersCount.textContent = String(orders.length);
     dom.profileEmail.textContent = String(p.email || p.Email || state.email || "—");
     dom.profileCreated.textContent = `Since ${formatDateTime(p.createdAt || p.CreatedAt)}`;
-    dom.profileFullName.value = String(p.fullName || p.FullName || "");
-    dom.profileAddress.value = String(p.address || p.Address || "");
+    dom.profileFullName.value = fullName;
+    dom.profileAddress.value = address;
+    if (!dom.checkoutFullName.value && fullName) {
+      dom.checkoutFullName.value = fullName;
+    }
+    if (!dom.checkoutAddress.value && address) {
+      dom.checkoutAddress.value = address;
+    }
   }
 
   async function handleSaveProfile(event) {
@@ -195,6 +642,8 @@
         showMessage(dom.profileMessage, resp.data?.reason || "Unable to save profile.");
         return;
       }
+      dom.checkoutFullName.value = fullName;
+      dom.checkoutAddress.value = address;
       await loadMyProfile();
       showMessage(dom.profileMessage, "Your delivery profile has been updated.", "success");
       showToast("Profile saved.");
@@ -354,6 +803,7 @@
   }
 
   async function handleSignOut() {
+    stopOrdersPolling();
     await fetch("/customer-auth/logout", {
       method: "POST",
       credentials: "same-origin",
@@ -380,12 +830,33 @@
         dom.newEmailInput.value = state.email;
       }
 
-      await loadMyProfile();
+      await Promise.all([
+        loadStorefront(),
+        loadMyBasket(),
+        loadMyProfile(),
+        loadMyOrdersAndPayments()
+      ]);
     } catch {
       redirectToLogin("expired");
     }
   }
 
+  dom.navStore.addEventListener("click", () => {
+    switchView("store");
+    loadStorefront();
+  });
+  dom.navBasket.addEventListener("click", () => {
+    switchView("basket");
+    loadMyBasket();
+  });
+  dom.topbarBasketBtn.addEventListener("click", () => {
+    switchView("basket");
+    loadMyBasket();
+  });
+  dom.navOrders.addEventListener("click", () => {
+    switchView("orders");
+    loadMyOrdersAndPayments();
+  });
   dom.navProfile.addEventListener("click", () => {
     switchView("profile");
     loadMyProfile();
@@ -395,6 +866,21 @@
     switchView("activity");
     loadMyActivity();
   });
+
+  dom.storeRefresh.addEventListener("click", () => loadStorefront());
+  dom.storeCategory.addEventListener("change", () => loadStorefront());
+  dom.storeSearch.addEventListener("input", () => {
+    if (state.searchDebounce) {
+      clearTimeout(state.searchDebounce);
+    }
+    state.searchDebounce = window.setTimeout(() => loadStorefront(), 220);
+  });
+
+  dom.basketRefresh.addEventListener("click", () => loadMyBasket());
+  dom.basketClear.addEventListener("click", () => clearMyBasket());
+  dom.checkoutForm.addEventListener("submit", handleCheckout);
+  dom.ordersRefresh.addEventListener("click", () => loadMyOrdersAndPayments());
+
   dom.profileRefresh.addEventListener("click", () => loadMyProfile());
   dom.activityRefresh.addEventListener("click", () => loadMyActivity());
   dom.profileForm.addEventListener("submit", handleSaveProfile);

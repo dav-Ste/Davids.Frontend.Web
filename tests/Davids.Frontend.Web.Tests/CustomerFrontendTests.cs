@@ -28,6 +28,9 @@ public sealed class CustomerFrontendTests : IClassFixture<WebApplicationFactory<
 
         var portalHtml = await portalResponse.Content.ReadAsStringAsync();
         Assert.Contains("Customer Portal", portalHtml);
+        Assert.Contains("Product Storefront", portalHtml);
+        Assert.Contains("Shopping basket &amp; checkout", portalHtml);
+        Assert.Contains("My orders &amp; payment receipts", portalHtml);
         Assert.Contains("My delivery profile", portalHtml);
         Assert.Contains("Change sign-in email", portalHtml);
         Assert.DoesNotContain("/admin-identity/", portalHtml, StringComparison.OrdinalIgnoreCase);
@@ -67,10 +70,16 @@ public sealed class CustomerFrontendTests : IClassFixture<WebApplicationFactory<
         {
             var appScript = await asset.Content.ReadAsStringAsync();
             Assert.Contains("DavidsWeb", appScript, StringComparison.Ordinal);
+            Assert.Contains("/products", appScript, StringComparison.Ordinal);
+            Assert.Contains("/baskets/me", appScript, StringComparison.Ordinal);
+            Assert.Contains("/orders/checkout", appScript, StringComparison.Ordinal);
+            Assert.Contains("/orders/me", appScript, StringComparison.Ordinal);
+            Assert.Contains("/payments/me", appScript, StringComparison.Ordinal);
             Assert.Contains("/customers/me", appScript, StringComparison.Ordinal);
             Assert.Contains("/identity/me/email", appScript, StringComparison.Ordinal);
             Assert.Contains("/identity/me/password", appScript, StringComparison.Ordinal);
             Assert.Contains("/customer-auth/logout", appScript, StringComparison.Ordinal);
+            Assert.DoesNotContain("innerHTML", appScript, StringComparison.Ordinal);
         }
 
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
