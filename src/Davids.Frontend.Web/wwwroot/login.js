@@ -1,8 +1,7 @@
 (() => {
   "use strict";
 
-  const onCustomerHost = /^(portal|web|customer)\./i.test(window.location.hostname);
-  const homePath = onCustomerHost ? "/" : "/portal";
+  const homePath = "/";
 
   const banner = document.getElementById("login-banner");
   const oidcBtn = document.getElementById("oidc-login-btn");

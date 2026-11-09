@@ -45,13 +45,11 @@ public sealed class CustomerFrontendTests : IClassFixture<WebApplicationFactory<
 
     [Theory]
     [InlineData("/app.css", "text/css")]
-    [InlineData("/portal/app.css", "text/css")]
     [InlineData("/login.css", "text/css")]
     [InlineData("/app.js", "text/javascript")]
-    [InlineData("/portal/app.js", "text/javascript")]
     [InlineData("/login.js", "text/javascript")]
     [InlineData("/favicon.svg", "image/svg+xml")]
-    public async Task ServesStaticAssetsAtRootAndPortalPrefixWithNoBrowserTokenStorage(string path, string mediaType)
+    public async Task ServesStaticAssetsAtRootWithNoBrowserTokenStorage(string path, string mediaType)
     {
         using var client = factory.CreateClient();
         using var asset = await client.GetAsync(path);

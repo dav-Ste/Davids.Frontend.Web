@@ -16,8 +16,8 @@
 
 ## Local Ports & Gateway Routing
 
-- Direct service listen URL (Aspire / local dev): `http://localhost:17322`
-- Via `Davids.APIGateway` (`https://localhost:17320/portal` or `https://portal.davids.local/`)
+- Direct asset host (Aspire / local dev): `http://localhost:17322`; sign-in and API calls require the gateway origin.
+- Via `Davids.APIGateway` (`http://localhost:17320/` (or HTTPS when configured); customer login is `/login`)
 
 ## Build & Test
 

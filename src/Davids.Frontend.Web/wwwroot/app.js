@@ -3,8 +3,7 @@
 
   const CSRF_HEADER_NAME = "X-Requested-With";
   const CSRF_HEADER_VALUE = "DavidsWeb";
-  const onCustomerHost = /^(portal|web|customer)\./i.test(window.location.hostname);
-  const loginPath = onCustomerHost ? "/login" : "/portal/login";
+  const loginPath = "/login";
 
   const state = {
     customerId: null,

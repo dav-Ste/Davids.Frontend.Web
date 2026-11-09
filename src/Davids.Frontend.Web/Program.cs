@@ -25,18 +25,8 @@ app.MapMethods("/login", new[] { "GET", "HEAD" }, (IWebHostEnvironment env) =>
     return Results.File(loginFile, "text/html; charset=utf-8");
 });
 
-app.MapMethods("/portal/login", new[] { "GET", "HEAD" }, (IWebHostEnvironment env) =>
-{
-    var loginFile = Path.Combine(env.WebRootPath, "login.html");
-    return Results.File(loginFile, "text/html; charset=utf-8");
-});
-
 app.UseDefaultFiles();
 app.UseStaticFiles();
-app.UseStaticFiles(new StaticFileOptions
-{
-    RequestPath = "/portal"
-});
 app.MapDefaultEndpoints();
 app.MapFallbackToFile("index.html");
 app.Run();
